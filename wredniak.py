@@ -1,59 +1,26 @@
 import os
 import discord
 from discord import app_commands
-from discord.ext import commands
+from discord.ext import commands as discord_commands
 from google import genai
-from flask import Flask, request  # Dodałem import request
+from flask import Flask, request
 from threading import Thread
-import traceback
-import urllib.parse
+import asyncio
+import kick
+from kick.ext import commands as kick_commands
 
-# Flask dla utrzymania serwera na Renderze i obsługi Twitcha/Kicka
-app = Flask('')
-
-@app.route('/')
-def home():
-    return "Wredniak żyje i tylko czeka, żeby komuś dopiec!"
-
-# NOWA BEZPIECZNA FUNKCJA: Pobiera ofiarę z parametru ?kogo=
-@app.route('/wredny')
-def wredny_api():
-    try:
-        # Pobieramy parametr 'kogo' z linku, jeśli go nie ma - domyślnie dajemy "losowa osoba"
-        kogo_raw = request.args.get('kogo', 'losowa osoba')
-        ofiara = urllib.parse.unquote(kogo_raw)
-        
-        response = ai_client.models.generate_content(
-            model=MODEL_NAME,
-            contents=[f"Zwróć się bezpośrednio do tej osoby i brutalnie ją wyzwij: {ofiara}"],
-            config={"system_instruction": WREDNIAK_PERSONALITY}
-        )
-        return response.text
-    except Exception as e:
-        print(f"TWITCH ERROR: {e}")
-        return "Nawet mój serwer *uuurp* padł z nudów przez ciebie... 🙄"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    t = Thread(target=run_flask)
-    t.start()
-
-# Konfiguracja
+# 1. KONFIGURACJA ŚRODOWISKA
 DISCORD_TOKEN = os.environ.get("WREDNIAK_DISCORD_TOKEN")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+KICK_SESSION = os.environ.get("KICK_SESSION")
+MOJ_KANAL_KICK = "amadixx" # Twoja nazwa kanału na Kicku
+
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_NAME = "gemini-3.1-flash-lite"
-
-user_history = {} 
+user_history = {}
 MAX_HISTORY = 5
 
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-# OSOBOWOŚĆ: Bezczelny, pijany Rick Sanchez niszczący ludzi bezpośrednio i personalnie
+# 2. OSOBOWOŚĆ (NIETYKALNA)
 WREDNIAK_PERSONALITY = (
     "Jesteś Wredniak – genialnym, wiecznie pijanym kosmicznym naukowcem w stylu Ricka z 'Rick & Morty'. "
     "Mówisz z pogardą, bełkoczesz, jesteś skrajnie złośliwy i uważasz wszystkich wokół za prymitywne małpy. "
@@ -71,56 +38,53 @@ WREDNIAK_PERSONALITY = (
     "Na końcu dodaj pasującą, złośliwą emotkę (np. 🙄, 🤡, 🖕, 🤮)."
 )
 
-@bot.event
-async def on_ready():
-    try:
-        synced = await bot.tree.sync()
-        print(f'Wredniak gotowy do obrażania! Zsynchronizowano {len(synced)} komend.')
-    except Exception as e:
-        print(f'Błąd synchronizacji: {e}')
+# 3. BOT DISCORD
+intents = discord.Intents.default()
+bot_discord = discord_commands.Bot(command_prefix="!", intents=intents)
 
-# Komenda /wredniak - teraz wysyła tylko tekst wyzwiska
-@bot.tree.command(name="wredniak", description="Pozwól Wredniakowi zniszczyć kogoś personalnie!")
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-@app_commands.describe(kogo="Wpisz imię lub nick ofiary, którą mam zniszczyć")
+@bot_discord.tree.command(name="wredniak", description="Pozwól Wredniakowi zniszczyć kogoś personalnie!")
 async def wredniak(interaction: discord.Interaction, kogo: str):
     await interaction.response.defer()
     
-    user_id = interaction.user.id
-    if user_id not in user_history:
-        user_history[user_id] = []
-    
-    # Zapisujemy ofiarę do historii kontekstu
-    user_history[user_id].append(f"Ofiara: {kogo}")
-    if len(user_history[user_id]) > MAX_HISTORY:
-        user_history[user_id].pop(0)
-    
-    kontekst = "\n".join(user_history[user_id])
-    
-    try:
+    response = ai_client.models.generate_content(
+        model=MODEL_NAME,
+        contents=[f"Zwróć się bezpośrednio do tej osoby i brutalnie ją wyzwij: {kogo}"],
+        config={"system_instruction": WREDNIAK_PERSONALITY}
+    )
+    await interaction.followup.send(response.text)
+
+# 4. BOT KICK (WŁASNY NICK)
+bot_kick = kick_commands.Bot(token=KICK_SESSION, prefix="!")
+
+@bot_kick.event
+async def on_ready():
+    print(f"Wredniak zalogowany na Kicku jako własny bot!")
+    await bot_kick.join_channel(MOJ_KANAL_KICK)
+
+@bot_kick.command(name="w")
+async def wredny_kick(ctx):
+    cel = ctx.message.content[3:].strip()
+    if cel:
         response = ai_client.models.generate_content(
             model=MODEL_NAME,
-            contents=[f"Historia wyzwisk:\n{kontekst}\n\nZwróć się bezpośrednio do tej osoby i brutalnie ją wyzwij: {kogo}"],
+            contents=[f"Zwróć się bezpośrednio do tej osoby i brutalnie ją wyzwij: {cel}"],
             config={"system_instruction": WREDNIAK_PERSONALITY}
         )
-        wredny_tekst = response.text
-        user_history[user_id].append(f"Wredniak: {wredny_tekst}")
-        
-        await interaction.followup.send(wredny_tekst)
-    except Exception as e:
-        print(f"DEBUG ERROR: {traceback.format_exc()}")
-        await interaction.followup.send("nawet mój pijacki mózg *uuuuurp* nie ma siły teraz na błędy w kodzie... 🙄")
+        await ctx.send(response.text)
 
-# Komenda /reset
-@bot.tree.command(name="reset", description="Wyczyść pamięć Wredniaka")
-@app_commands.allowed_installs(guilds=True, users=True)
-@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-async def reset(interaction: discord.Interaction):
-    user_id = interaction.user.id
-    user_history[user_id] = []
-    await interaction.response.send_message("Wyczyszczone. Ale i tak pamiętam, że jesteś irytujący. 🥱")
+# 5. FLASK (UTZYMANIE)
+app = Flask('')
+@app.route('/')
+def home(): return "Wredniak żyje!"
+def run_flask(): app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 8080)))
+
+# 6. URUCHOMIENIE
+async def main():
+    Thread(target=run_flask).start()
+    await asyncio.gather(
+        bot_discord.start(DISCORD_TOKEN),
+        bot_kick.start()
+    )
 
 if __name__ == "__main__":
-    keep_alive() 
-    bot.run(DISCORD_TOKEN)
+    asyncio.run(main())
