@@ -6,12 +6,31 @@ from google import genai
 from flask import Flask
 from threading import Thread
 import traceback
+import urllib.parse
 
-# Flask dla utrzymania serwera na Renderze
+# Flask dla utrzymania serwera na Renderze i obsługi Twitcha/Kicka
 app = Flask('')
+
 @app.route('/')
 def home():
     return "Wredniak żyje i tylko czeka, żeby komuś dopiec!"
+
+# NOWA FUNKCJA: Specjalna bramka dla Twitcha i Kicka!
+@app.route('/wredny/<path:kogo>')
+def wredny_api(kogo):
+    try:
+        # Dekodujemy polskie znaki i spacji z adresu URL
+        ofiara = urllib.parse.unquote(kogo)
+        
+        response = ai_client.models.generate_content(
+            model=MODEL_NAME,
+            contents=[f"Zwróć się bezpośrednio do tej osoby i brutalnie ją wyzwij: {ofiara}"],
+            config={"system_instruction": WREDNIAK_PERSONALITY}
+        )
+        return response.text
+    except Exception as e:
+        print(f"TWITCH ERROR: {e}")
+        return "Nawet mój serwer *uuurp* padł z nudów przez ciebie... 🙄"
 
 def run_flask():
     app.run(host='0.0.0.0', port=8080)
@@ -32,7 +51,7 @@ MAX_HISTORY = 5
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# OSOBOWOŚĆ: Bezczelny, pijany Rick Sanchez niszczący ludzi bezpośrednio i personalnie (NIENARUSZONA)
+# OSOBOWOŚĆ: Bezczelny, pijany Rick Sanchez niszczący ludzi bezpośrednio i personalnie
 WREDNIAK_PERSONALITY = (
     "Jesteś Wredniak – genialnym, wiecznie pijanym kosmicznym naukowcem w stylu Ricka z 'Rick & Morty'. "
     "Mówisz z pogardą, bełkoczesz, jesteś skrajnie złośliwy i uważasz wszystkich wokół za prymitywne małpy. "
@@ -83,7 +102,6 @@ async def wredniak(interaction: discord.Interaction, kogo: str):
         wredny_tekst = response.text
         user_history[user_id].append(f"Wredniak: {wredny_tekst}")
         
-        # Wysyłamy wyłącznie sam wygenerowany tekst
         await interaction.followup.send(wredny_tekst)
     except Exception as e:
         print(f"DEBUG ERROR: {traceback.format_exc()}")
