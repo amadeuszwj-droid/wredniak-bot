@@ -3,7 +3,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 from google import genai
-from flask import Flask
+from flask import Flask, request  # Dodałem import request
 from threading import Thread
 import traceback
 import urllib.parse
@@ -15,12 +15,13 @@ app = Flask('')
 def home():
     return "Wredniak żyje i tylko czeka, żeby komuś dopiec!"
 
-# NOWA FUNKCJA: Specjalna bramka dla Twitcha i Kicka!
-@app.route('/wredny/<path:kogo>')
-def wredny_api(kogo):
+# NOWA BEZPIECZNA FUNKCJA: Pobiera ofiarę z parametru ?kogo=
+@app.route('/wredny')
+def wredny_api():
     try:
-        # Dekodujemy polskie znaki i spacje z adresu URL
-        ofiara = urllib.parse.unquote(kogo)
+        # Pobieramy parametr 'kogo' z linku, jeśli go nie ma - domyślnie dajemy "losowa osoba"
+        kogo_raw = request.args.get('kogo', 'losowa osoba')
+        ofiara = urllib.parse.unquote(kogo_raw)
         
         response = ai_client.models.generate_content(
             model=MODEL_NAME,
@@ -33,7 +34,6 @@ def wredny_api(kogo):
         return "Nawet mój serwer *uuurp* padł z nudów przez ciebie... 🙄"
 
 def run_flask():
-    # Pobieramy port przypisany przez Render, domyślnie ustawiając 8080
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
