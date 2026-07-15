@@ -1,22 +1,19 @@
 import os
 import discord
 from discord import app_commands
-from discord.ext import commands as discord_commands
+from discord.ext import commands
 from google import genai
-from flask import Flask
+from flask import Flask, request
 from threading import Thread
-import asyncio
-import requests # Używamy standardowych requests zamiast problematycznego 'kick'
+import requests
 
 # 1. KONFIGURACJA
 DISCORD_TOKEN = os.environ.get("WREDNIAK_DISCORD_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-KICK_SESSION = os.environ.get("KICK_SESSION")
-
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
 MODEL_NAME = "gemini-3.1-flash-lite"
 
-# 2. OSOBOWOŚĆ - NIE RUSZONA!
+# 2. OSOBOWOŚĆ (NIETYKALNA)
 WREDNIAK_PERSONALITY = (
     "Jesteś Wredniak – genialnym, wiecznie pijanym kosmicznym naukowcem w stylu Ricka z 'Rick & Morty'. "
     "Mówisz z pogardą, bełkoczesz, jesteś skrajnie złośliwy i uważasz wszystkich wokół za prymitywne małpy. "
@@ -34,9 +31,24 @@ WREDNIAK_PERSONALITY = (
     "Na końcu dodaj pasującą, złośliwą emotkę (np. 🙄, 🤡, 🖕, 🤮)."
 )
 
-# 3. BOT DISCORD
-intents = discord.Intents.default()
-bot = discord_commands.Bot(command_prefix="!", intents=intents)
+# 3. API DLA KICKA
+app = Flask('')
+@app.route('/wredny')
+def wredny_api():
+    kogo = request.args.get('kogo', 'widzowie')
+    response = ai_client.models.generate_content(
+        model=MODEL_NAME,
+        contents=[f"Zniszcz tego celu: {kogo}"],
+        config={"system_instruction": WREDNIAK_PERSONALITY}
+    )
+    return response.text
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# 4. BOT DISCORD
+bot = commands.Bot(command_prefix="!", intents=discord.Intents.default())
 
 @bot.tree.command(name="wredniak", description="Wredniak atakuje!")
 async def wredniak(interaction: discord.Interaction, kogo: str):
@@ -48,18 +60,6 @@ async def wredniak(interaction: discord.Interaction, kogo: str):
     )
     await interaction.followup.send(response.text)
 
-# 4. FLASK (UTZYMANIE + API DLA KICKA)
-app = Flask('')
-@app.route('/')
-def home(): return "Wredniak żyje!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host='0.0.0.0', port=port)
-
-# 5. URUCHOMIENIE
 if __name__ == "__main__":
-    # Odpalamy serwer Flask w tle
     Thread(target=run_flask).start()
-    # Odpalamy bota Discorda
     bot.run(DISCORD_TOKEN)
