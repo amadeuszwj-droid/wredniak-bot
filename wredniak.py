@@ -19,7 +19,7 @@ def home():
 @app.route('/wredny/<path:kogo>')
 def wredny_api(kogo):
     try:
-        # Dekodujemy polskie znaki i spacji z adresu URL
+        # Dekodujemy polskie znaki i spacje z adresu URL
         ofiara = urllib.parse.unquote(kogo)
         
         response = ai_client.models.generate_content(
@@ -33,7 +33,9 @@ def wredny_api(kogo):
         return "Nawet mój serwer *uuurp* padł z nudów przez ciebie... 🙄"
 
 def run_flask():
-    app.run(host='0.0.0.0', port=8080)
+    # Pobieramy port przypisany przez Render, domyślnie ustawiając 8080
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
 
 def keep_alive():
     t = Thread(target=run_flask)
