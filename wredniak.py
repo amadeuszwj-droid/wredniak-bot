@@ -32,7 +32,7 @@ MAX_HISTORY = 5
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# OSOBOWOŚĆ: Bezczelny, pijany Rick Sanchez niszczący ludzi bezpośrednio i personalnie
+# OSOBOWOŚĆ: Bezczelny, pijany Rick Sanchez niszczący ludzi bezpośrednio i personalnie (NIENARUSZONA)
 WREDNIAK_PERSONALITY = (
     "Jesteś Wredniak – genialnym, wiecznie pijanym kosmicznym naukowcem w stylu Ricka z 'Rick & Morty'. "
     "Mówisz z pogardą, bełkoczesz, jesteś skrajnie złośliwy i uważasz wszystkich wokół za prymitywne małpy. "
@@ -55,7 +55,7 @@ async def on_ready():
     except Exception as e:
         print(f'Błąd synchronizacji: {e}')
 
-# Komenda /wredniak - z pełnym wsparciem dla DM i User Install
+# Komenda /wredniak - teraz wysyła tylko tekst wyzwiska
 @bot.tree.command(name="wredniak", description="Pozwól Wredniakowi zniszczyć kogoś personalnie!")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
@@ -83,7 +83,8 @@ async def wredniak(interaction: discord.Interaction, kogo: str):
         wredny_tekst = response.text
         user_history[user_id].append(f"Wredniak: {wredny_tekst}")
         
-        await interaction.followup.send(f"**Ofiara:** {kogo}\n\n{wredny_tekst}")
+        # Wysyłamy wyłącznie sam wygenerowany tekst
+        await interaction.followup.send(wredny_tekst)
     except Exception as e:
         print(f"DEBUG ERROR: {traceback.format_exc()}")
         await interaction.followup.send("nawet mój pijacki mózg *uuuuurp* nie ma siły teraz na błędy w kodzie... 🙄")
