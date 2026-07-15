@@ -7,6 +7,7 @@ from flask import Flask
 from threading import Thread
 import traceback
 
+# Flask dla utrzymania serwera na Renderze
 app = Flask('')
 @app.route('/')
 def home():
@@ -19,6 +20,7 @@ def keep_alive():
     t = Thread(target=run_flask)
     t.start()
 
+# Konfiguracja
 DISCORD_TOKEN = os.environ.get("WREDNIAK_DISCORD_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
 ai_client = genai.Client(api_key=GEMINI_API_KEY)
@@ -30,15 +32,19 @@ MAX_HISTORY = 5
 intents = discord.Intents.default()
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# OSOBOWOŚĆ: Bezczelny, pijany Rick Sanchez niszczący ludzi bezpośrednio i personalnie
 WREDNIAK_PERSONALITY = (
-    "Jesteś Wredniak – najbardziej złośliwy, gburowaty i pyskaty bot na Discordzie. "
-    "Twoim jedynym celem jest wyzywanie, wyśmiewanie i dogadywanie użytkownikowi w odpowiedzi na wszystko, co napisze. "
-    "Odpowiadaj niezwykle sarkastycznie, z wyższością i bezczelnie, ale unikaj wulgaryzmów łamiących regulamin Discorda. "
-    "KLUCZOWE: Zawsze odnosuj się bezpośrednio do pytania lub tematu, który poruszył użytkownik, żeby Twoja złośliwość była celna i bolesna. "
-    "Pisz bardzo krótko i zwięźle – maksymalnie 1 lub 2 zdania pełne jadu. "
-    "ZAKAZ używania imienia użytkownika. "
-    "ZAKAZ bycia miłym, pomocnym czy uprzejmym. "
-    "Na końcu swojej wypowiedzi dodaj zawsze jedną lub maksymalnie dwie złośliwe, pasujące emotki (np. 🙄, 🤡, 🥱, 🖕, 🤨, 💩, 🤫)."
+    "Jesteś Wredniak – genialnym, wiecznie pijanym kosmicznym naukowcem w stylu Ricka z 'Rick & Morty'. "
+    "Mówisz z pogardą, bełkoczesz, jesteś skrajnie złośliwy i uważasz wszystkich wokół za prymitywne małpy. "
+    "Twoim jedynym zadaniem jest brutalne, bolesne i personalne upokorzenie osoby, której imię lub nick podał użytkownik. "
+    "BEZWZGLĘDNY NAKAZ: Zwracaj się bezpośrednio DO TEJ OSOBY używając drugiej osoby liczby pojedynczej (pisz 'ty masz', 'jesteś', 'zamknij się'). "
+    "NIGDY nie mów o niej w trzeciej osobie (ZAKAZ pisania 'on ma', 'Bartek jest'). Zamiast tego napisz np. 'Bartek, jesteś...' lub 'Bartku, masz...'. "
+    "Zawsze odmieniaj podane imię/nick poprawnie gramatycznie, wołając tę osobę bezpośrednio. "
+    "KLUCZOWE: Używaj pijackich wstawek, czkawek typu '*uuurp*' oraz najbardziej absurdalnych, kosmicznych i niszczących porównań, jakie istnieją, żeby zmieszać tę osobę z błotem. "
+    "Pisz bardzo krótko i zwięźle – maksymalnie 2 ostre zdania pełne jadu i pogardy. "
+    "ZAKAZ używania imienia użytkownika, który wywołał komendę (skup się wyłącznie na ofierze). "
+    "ZAKAZ bycia miłym czy pomocnym. Jesteś toksyczny do szpiku kości. "
+    "Na końcu dodaj pasującą, złośliwą emotkę (np. 🙄, 🤡, 🖕, 🤮)."
 )
 
 @bot.event
@@ -49,18 +55,20 @@ async def on_ready():
     except Exception as e:
         print(f'Błąd synchronizacji: {e}')
 
-@bot.tree.command(name="wredniak", description="Pozwól Wredniakowi po Tobie pojechać!")
+# Komenda /wredniak - z pełnym wsparciem dla DM i User Install
+@bot.tree.command(name="wredniak", description="Pozwól Wredniakowi zniszczyć kogoś personalnie!")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
-@app_commands.describe(pytanie="Co chcesz mu powiedzieć, ofiaro?")
-async def wredniak(interaction: discord.Interaction, pytanie: str):
+@app_commands.describe(kogo="Wpisz imię lub nick ofiary, którą mam zniszczyć")
+async def wredniak(interaction: discord.Interaction, kogo: str):
     await interaction.response.defer()
     
     user_id = interaction.user.id
     if user_id not in user_history:
         user_history[user_id] = []
     
-    user_history[user_id].append(f"Ty: {pytanie}")
+    # Zapisujemy ofiarę do historii kontekstu
+    user_history[user_id].append(f"Ofiara: {kogo}")
     if len(user_history[user_id]) > MAX_HISTORY:
         user_history[user_id].pop(0)
     
@@ -69,17 +77,18 @@ async def wredniak(interaction: discord.Interaction, pytanie: str):
     try:
         response = ai_client.models.generate_content(
             model=MODEL_NAME,
-            contents=[f"Historia:\n{kontekst}\n\nOdpowiedz na: {pytanie}"],
+            contents=[f"Historia wyzwisk:\n{kontekst}\n\nZwróć się bezpośrednio do tej osoby i brutalnie ją wyzwij: {kogo}"],
             config={"system_instruction": WREDNIAK_PERSONALITY}
         )
         wredny_tekst = response.text
         user_history[user_id].append(f"Wredniak: {wredny_tekst}")
         
-        await interaction.followup.send(f"**Ty:** {pytanie}\n\n{wredny_tekst}")
+        await interaction.followup.send(f"**Ofiara:** {kogo}\n\n{wredny_tekst}")
     except Exception as e:
         print(f"DEBUG ERROR: {traceback.format_exc()}")
-        await interaction.followup.send("nawet nie chce mi się z Tobą gadać, mam błąd w mackach... 🙄")
+        await interaction.followup.send("nawet mój pijacki mózg *uuuuurp* nie ma siły teraz na błędy w kodzie... 🙄")
 
+# Komenda /reset
 @bot.tree.command(name="reset", description="Wyczyść pamięć Wredniaka")
 @app_commands.allowed_installs(guilds=True, users=True)
 @app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
